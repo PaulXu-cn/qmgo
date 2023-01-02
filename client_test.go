@@ -31,6 +31,11 @@ func initClient(col string) *QmgoClient {
 		Database: "qmgotest",
 		Coll:     col,
 	}
+	cfg = Config{
+		Uri:      "mongodb://root:123456@localhost:27017",
+		Database: "test",
+		Coll:     col,
+	}
 	var cTimeout int64 = 0
 	var sTimeout int64 = 500000
 	var maxPoolSize uint64 = 30000

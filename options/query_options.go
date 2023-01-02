@@ -13,6 +13,14 @@
 
 package options
 
+const (
+	DECODE_ERR_THORW_OUT = 0
+	DECODE_ERR_IGNORE_ROW = 1
+	DECODE_ERR_IGNORE_FIELD = 2
+)
+
 type FindOptions struct {
 	QueryHook interface{}
+	// How to deal with the data if decode error, 0-default throw out error, 1-ignore row, 2-ignore field
+	DecodeErrIgnore uint32
 }

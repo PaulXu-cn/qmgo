@@ -15,15 +15,20 @@ package qmgo
 
 import (
 	"context"
+	"log"
+	"reflect"
+	"strings"
 
+	"github.com/qiniu/qmgo/options"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Cursor struct define
 type Cursor struct {
-	ctx    context.Context
-	cursor *mongo.Cursor
-	err    error
+	ctx       context.Context
+	cursor    *mongo.Cursor
+	err       error
+	ignoreErr uint32
 }
 
 // Next gets the next document for this cursor. It returns true if there were no errors and the cursor has not been
@@ -37,6 +42,37 @@ func (c *Cursor) Next(result interface{}) bool {
 		err = c.cursor.Decode(result)
 		if err == nil {
 			return true
+		} else if options.DECODE_ERR_IGNORE_FIELD != c.ignoreErr {
+			return false
+		} else {
+			resultv := reflect.ValueOf(result)
+			if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Struct {
+				log.Fatal("result argument must be a slice address")
+			}
+
+			// 取指针指向的结构体变量
+			v := resultv.Elem()
+
+			// 解析字段, NumField() 4 个字段。
+			for i := 0; i < v.NumField(); i++ {
+				// 获取结构体字段信息
+				structField := v.Type().Field(i)
+				// 取tag
+				tag := structField.Tag
+				// 解析label tag，获取tag值
+				label := tag.Get("bson")
+				if label == "" {
+					continue
+				}
+				fields := strings.Split(label, ",")
+				if rawVal := c.cursor.Current.Lookup(fields[0]); rawVal.Validate() == nil {
+					if unmErr := rawVal.Unmarshal(v.Field(i).Addr().Interface()); unmErr != nil {
+						// TODO Log something ?
+						continue
+					}
+				}
+			}
+			return true
 		}
 	}
 	return false
@@ -48,7 +84,35 @@ func (c *Cursor) All(results interface{}) error {
 	if c.err != nil {
 		return c.err
 	}
-	return c.cursor.All(c.ctx, results)
+	if options.DECODE_ERR_THORW_OUT == c.ignoreErr {
+		return c.cursor.All(c.ctx, results)
+	} else {
+		resultv := reflect.ValueOf(results)
+		if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
+			log.Fatal("result argument must be a slice address")
+		}
+		slicev := resultv.Elem()
+		slicev = slicev.Slice(0, slicev.Cap())
+		elemt := slicev.Type().Elem()
+		i := 0
+		for {
+			if slicev.Len() == i {
+				elemp := reflect.New(elemt)
+				if !c.Next(elemp.Interface()) {
+					break
+				}
+				slicev = reflect.Append(slicev, elemp.Elem())
+				slicev = slicev.Slice(0, slicev.Cap())
+			} else {
+				if !c.Next(slicev.Index(i).Addr().Interface()) {
+					break
+				}
+			}
+			i++
+		}
+		resultv.Elem().Set(slicev.Slice(0, i))
+		return c.Close()
+	}
 }
 
 // ID returns the ID of this cursor, or 0 if the cursor has been closed or exhausted.

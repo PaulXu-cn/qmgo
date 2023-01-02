@@ -208,6 +208,11 @@ func (q *Query) All(result interface{}) error {
 		cursor: cursor,
 		err:    err,
 	}
+	if q.opts != nil {
+		for _, opt := range q.opts {
+			c.ignoreErr = opt.DecodeErrIgnore
+		}
+	}
 	err = c.All(result)
 	if err != nil {
 		return err

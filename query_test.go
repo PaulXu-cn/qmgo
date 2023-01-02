@@ -16,6 +16,7 @@ package qmgo
 import (
 	"context"
 	"fmt"
+	opts "github.com/qiniu/qmgo/options"
 	"testing"
 	"time"
 
@@ -175,6 +176,42 @@ func TestQuery_All(t *testing.T) {
 	err = cli.Find(context.Background(), filter1).All(&tt)
 	ast.NoError(err)
 	ast.Equal(2, len(tt))
+}
+
+type File struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	CreatedAt *time.Time         `json:"created_at" bson:"created_at"`
+	Name      string             `json:"file_name,omitempty" bson:"file_name,omitempty"`
+	Size      int                `json:"size" bson:"file_size,omitempty"`
+	Path      string             `json:"path" bson:"path"`
+	Type      string             `json:"type" bson:"type"`
+	Data      []byte             `json:"-" bson:"-"`
+	Url       string             `json:"url" bson:"-"`
+}
+
+func TestQuery_All_Opt(t *testing.T) {
+	ast := require.New(t)
+	cli := initClient("file")
+
+	var err error
+	var res []File
+
+	filter1 := bson.M{
+		"file_size":  bson.M{"$gte": 2},
+	}
+
+	err = cli.Find(context.Background(), filter1).Sort("age").Limit(10).Skip(0).All(&res)
+	ast.Error(err)
+	t.Logf("get res1 %v\n", res)
+
+	var res2 []File
+	err = cli.Find(context.Background(), filter1, opts.FindOptions{DecodeErrIgnore: opts.DECODE_ERR_IGNORE_FIELD}).
+		Sort("age").Limit(10).Skip(0).All(&res2)
+	ast.NoError(err)
+	for i, r := range res2 {
+		t.Logf("get res2 %d %+v\n", i, r)
+	}
+	ast.Equal(1, len(res))
 }
 
 func TestQuery_Count(t *testing.T) {
