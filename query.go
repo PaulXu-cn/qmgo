@@ -154,10 +154,19 @@ func (q *Query) One(result interface{}) error {
 	err := q.collection.FindOne(q.ctx, q.filter, opt).Decode(result)
 
 	if err != nil {
-		return err
-	}
-	if len(q.opts) > 0 {
-		if err := middleware.Do(q.ctx, q.opts[0].QueryHook, operator.AfterQuery); err != nil {
+		var ignoreErr uint32 = 0
+		if q.opts != nil {
+			for _, opt := range q.opts {
+				if opt.DecodeErrIgnore > 0 {
+					ignoreErr = opt.DecodeErrIgnore
+				}
+			}
+		}
+		if ignoreErr != qOpts.DECODE_ERR_THORW_OUT {
+			if err := middleware.Do(q.ctx, q.opts[0].QueryHook, operator.AfterQuery); err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 	}
@@ -210,15 +219,18 @@ func (q *Query) All(result interface{}) error {
 	}
 	if q.opts != nil {
 		for _, opt := range q.opts {
-			c.ignoreErr = opt.DecodeErrIgnore
+			if opt.DecodeErrIgnore > 0 {
+				c.ignoreErr = opt.DecodeErrIgnore
+			}
 		}
 	}
 	err = c.All(result)
 	if err != nil {
-		return err
-	}
-	if len(q.opts) > 0 {
-		if err := middleware.Do(q.ctx, q.opts[0].QueryHook, operator.AfterQuery); err != nil {
+		if c.ignoreErr != qOpts.DECODE_ERR_THORW_OUT {
+			if err := middleware.Do(q.ctx, q.opts[0].QueryHook, operator.AfterQuery); err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 	}
