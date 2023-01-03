@@ -46,12 +46,17 @@ func (c *Cursor) Next(result interface{}) bool {
 			return false
 		} else {
 			resultv := reflect.ValueOf(result)
-			if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Struct {
-				log.Fatal("result argument must be a slice address")
+			if resultv.Kind() != reflect.Ptr ||
+				!(resultv.Elem().Kind() == reflect.Struct || resultv.Elem().Kind() == reflect.Ptr) {
+				log.Fatalf("result argument must be a slice、map or address, result-k %d, ele-k %d",
+					resultv.Kind(), resultv.Elem().Kind())
 			}
 
 			// 取指针指向的结构体变量
 			v := resultv.Elem()
+			if resultv.Elem().Kind() == reflect.Ptr {
+				v = resultv.Elem().Elem()
+			}
 
 			// 解析字段, NumField() 4 个字段。
 			for i := 0; i < v.NumField(); i++ {
@@ -88,8 +93,10 @@ func (c *Cursor) All(results interface{}) error {
 		return c.cursor.All(c.ctx, results)
 	} else {
 		resultv := reflect.ValueOf(results)
-		if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
-			log.Fatal("result argument must be a slice address")
+		if resultv.Kind() != reflect.Ptr ||
+			!(resultv.Elem().Kind() == reflect.Slice || resultv.Elem().Kind() == reflect.Ptr) {
+			log.Fatalf("result argument must be a slice、map or address, result-k %d, ele-k %d",
+				resultv.Kind(), resultv.Elem().Kind())
 		}
 		slicev := resultv.Elem()
 		slicev = slicev.Slice(0, slicev.Cap())
