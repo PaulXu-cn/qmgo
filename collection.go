@@ -16,6 +16,7 @@ package qmgo
 import (
 	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"reflect"
 	"strings"
 
@@ -42,6 +43,17 @@ func (c *Collection) Find(ctx context.Context, filter interface{}, opts ...opts.
 		ctx:        ctx,
 		collection: c.collection,
 		filter:     filter,
+		opts:       opts,
+		registry:   c.registry,
+	}
+}
+
+// Find find by condition filter，return QueryI
+func (c *Collection) FindId(ctx context.Context, id primitive.ObjectID, opts ...opts.FindOptions) QueryI {
+	return &Query{
+		ctx:        ctx,
+		collection: c.collection,
+		filter:     bson.M{"_id": id},
 		opts:       opts,
 		registry:   c.registry,
 	}
